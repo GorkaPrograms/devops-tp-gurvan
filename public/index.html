@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevOps TP — Pipeline Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 1rem;
+      padding: 2.5rem;
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+    }
+
+    .badge {
+      display: inline-block;
+      background: #3b82f6;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .step {
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 0.5rem;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .step.active { border-color: #3b82f6; color: #3b82f6; }
+    .arrow { color: #475569; font-size: 0.8rem; }
+
+    .form-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    input {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 0.5rem;
+      padding: 0.6rem 1rem;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: #3b82f6; }
+
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      padding: 0.6rem 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #2563eb; }
+
+    .result {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.9rem;
+      text-align: left;
+      min-height: 3rem;
+      color: #4ade80;
+    }
+
+    .result.error { color: #f87171; }
+
+    .health-bar {
+      margin-top: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">DevOps TP</div>
+    <h1>Pipeline Demo 🚀</h1>
+    <p class="subtitle">App déployée via GitHub Actions + Docker</p>
+
+    <div class="pipeline">
+      <span class="step active">commit</span>
+      <span class="arrow">→</span>
+      <span class="step active">CI tests</span>
+      <span class="arrow">→</span>
+      <span class="step active">Docker build</span>
+      <span class="arrow">→</span>
+      <span class="step active">Docker Hub</span>
+      <span class="arrow">→</span>
+      <span class="step active">n8n notify</span>
+    </div>
+
+    <div class="form-group">
+      <input type="text" id="nameInput" placeholder="Entrez un prénom..." />
+      <button onclick="sayHello()">Say Hello</button>
+    </div>
+
+    <div class="result" id="result">En attente...</div>
+
+    <div class="health-bar">
+      <div class="dot"></div>
+      <span id="healthStatus">Vérification du statut...</span>
+    </div>
+  </div>
+
+  <script>
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        document.getElementById('healthStatus').textContent =
+          `API OK — v${data.version} — ${new Date(data.timestamp).toLocaleTimeString()}`;
+      } catch {
+        document.getElementById('healthStatus').textContent = 'API unreachable';
+      }
+    }
+
+    async function sayHello() {
+      const name = document.getElementById('nameInput').value.trim();
+      const resultEl = document.getElementById('result');
+
+      if (!name) {
+        resultEl.className = 'result error';
+        resultEl.textContent = '❌ Veuillez entrer un prénom.';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/hello/${encodeURIComponent(name)}`);
+        const data = await res.json();
+        resultEl.className = 'result';
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        resultEl.className = 'result error';
+        resultEl.textContent = `❌ Erreur: ${err.message}`;
+      }
+    }
+
+    document.getElementById('nameInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sayHello();
+    });
+
+    checkHealth();
+    setInterval(checkHealth, 30000);
+  </script>
+</body>
+</html>

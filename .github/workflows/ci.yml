@@ -1,0 +1,113 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/devops-tp
+
+jobs:
+  # ============================================================
+  # JOB 1 — Tests
+  # Objectif : vérifier que le code ne casse rien avant d'aller plus loin
+  # ============================================================
+  test:
+    name: 🧪 Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # TODO TP1 — Étape 1 : Installer les dépendances
+      # Remplacer les ??? par la bonne commande npm
+      # Indice : on veut une installation propre et rapide
+      - name: Installation des dépendances
+        run: ???
+
+      # TODO TP1 — Étape 2 : Lancer les tests
+      # Remplacer les ??? par la commande définie dans package.json
+      - name: Lancement des tests
+        run: ???
+
+  # ============================================================
+  # JOB 2 — Build & Push Docker
+  # Objectif : construire l'image et la pousser sur Docker Hub
+  # Ce job ne se lance QUE si les tests passent
+  # ============================================================
+  build-and-push:
+    name: 🐳 Build & Push Docker
+    runs-on: ubuntu-latest
+    needs: test
+
+    # TODO TP1 — Challenge : ce job ne doit tourner QUE sur la branche main
+    # Décommenter et compléter la ligne ci-dessous
+    # if: ???
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      # TODO TP1 — Étape 3 : Se connecter à Docker Hub
+      # Utiliser l'action docker/login-action@v3
+      # Les credentials viennent des secrets GitHub
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ???
+          password: ???
+
+      # TODO TP1 — Étape 4 : Builder l'image Docker
+      # Remplacer les ??? par les bonnes valeurs
+      # L'image doit être taguée avec le SHA du commit ET "latest"
+      - name: Build de l'image Docker
+        run: |
+          docker build \
+            --build-arg APP_VERSION=${{ github.sha }} \
+            -t ${{ env.IMAGE_NAME }}:??? \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            .
+
+      # TODO TP1 — Étape 5 : Pousser l'image sur Docker Hub
+      # Pousser les deux tags (SHA et latest)
+      - name: Push sur Docker Hub
+        run: |
+          docker push ${{ env.IMAGE_NAME }}:???
+          docker push ${{ env.IMAGE_NAME }}:latest
+
+  # ============================================================
+  # JOB 3 — Notification n8n
+  # Objectif : notifier n8n du résultat du pipeline
+  # Ce job se lance TOUJOURS, même si les jobs précédents échouent
+  # ============================================================
+  notify:
+    name: 🔔 Notification n8n
+    runs-on: ubuntu-latest
+    needs: [test, build-and-push]
+    if: always()
+
+    steps:
+      # TODO TP3 — Étape 6 : Appeler le webhook n8n
+      # Remplacer les ??? par les bonnes valeurs
+      # Le payload doit contenir : status, branch, author, image, run_url
+      - name: Envoi webhook n8n
+        run: |
+          curl -X POST "${{ secrets.N8N_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status": "???",
+              "branch": "${{ github.ref_name }}",
+              "author": "${{ github.actor }}",
+              "image": "${{ env.IMAGE_NAME }}:${{ github.sha }}",
+              "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "commit_message": "${{ github.event.head_commit.message }}"
+            }'
