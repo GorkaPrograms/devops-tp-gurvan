@@ -1,5 +1,5 @@
 # ================================
-# Étape 1 — Build & install deps
+# Étape 1 — Build & install 
 # ================================
 FROM node:20-alpine AS builder
 
